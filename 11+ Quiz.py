@@ -4,7 +4,7 @@ import random
 
 # Load Excel
 import os
-df = pd.read_excel(os.path.join(os.path.dirname(__file__), "WordBank.xlsx")  # Correct
+df = pd.read_excel(os.path.join(os.path.dirname(__file__), "WordBank.xlsx"))  # Correct
 words = df.to_dict(orient="records")
 
 # Initialize session state
