@@ -3,7 +3,8 @@ import pandas as pd
 import random
 
 # Load Excel
-df = pd.read_excel("WordBank.xlsx")
+import os
+df = pd.read_excel(os.path.join(os.path.dirname(__file__), "WordBank.xlsx")
 words = df.to_dict(orient="records")
 
 # Initialize session state
