@@ -156,7 +156,7 @@ else:
                 st.rerun()
 
     # Final score screen
-    else:
+else:
     st.balloons()
     st.subheader(f"Quiz Complete! Score: {quiz['score']}/20")
     
@@ -182,3 +182,4 @@ else:
         st.rerun()
     
     
+
