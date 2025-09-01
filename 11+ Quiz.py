@@ -156,30 +156,31 @@ else:
                 st.rerun()
 
     # Final score screen
-else:
-    st.balloons()
-    st.subheader(f"Quiz Complete! Score: {quiz['score']}/20")
+    else:
+        st.balloons()
+        st.subheader(f"Quiz Complete! Score: {quiz['score']}/20")
+        
+        # Progress Report - Show repetition score distribution
+        st.subheader("📊 Progress Report")
+        st.write("Occasions correctly answered / number of words")
+        
+        # Get all repetition values and count distribution
+        repetition_counts = df['Repetition'].value_counts().sort_index()
+        
+        # Display each repetition level
+        for rep_value in sorted(df['Repetition'].unique()):
+            count = repetition_counts.get(rep_value, 0)
+            st.write(f"{rep_value} / {count}")
+        
+        # Show summary stats
+        total_words = len(df)
+        mastered_words = len(df[df['Repetition'] > 0])
+        st.success(f"**Mastered: {mastered_words}/{total_words} words**")
+        
+        if st.button("Restart Quiz"):
+            st.session_state.clear()
+            st.rerun()
     
-    # Progress Report - Show repetition score distribution
-    st.subheader("📊 Progress Report")
-    st.write("Occasions correctly answered / number of words")
     
-    # Get all repetition values and count distribution
-    repetition_counts = df['Repetition'].value_counts().sort_index()
-    
-    # Display each repetition level
-    for rep_value in sorted(df['Repetition'].unique()):
-        count = repetition_counts.get(rep_value, 0)
-        st.write(f"{rep_value} / {count}")
-    
-    # Show summary stats
-    total_words = len(df)
-    mastered_words = len(df[df['Repetition'] > 0])
-    st.success(f"**Mastered: {mastered_words}/{total_words} words**")
-    
-    if st.button("Restart Quiz"):
-        st.session_state.clear()
-        st.rerun()
-    
-    
+
 
