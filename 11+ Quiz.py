@@ -2,10 +2,53 @@ import streamlit as st
 import pandas as pd
 import random
 
-# Load Excel
-import os
-df = pd.read_excel(os.path.join(os.path.dirname(__file__), "WordBank.xlsx"))  # Correct
+# Google Sheets Setup
+import gspread
+from google.oauth2.service_account import Credentials
+
+# Authenticate with Google Sheets
+SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+SERVICE_ACCOUNT_INFO = st.secrets["gcp_service_account"]
+CREDS = Credentials.from_service_account_info(SERVICE_ACCOUNT_INFO, scopes=SCOPE)
+CLIENT = gspread.authorize(CREDS)
+
+# Open your Google Sheet
+SHEET_ID = st.secrets["sheets"]["sheet_id"]
+sheet = CLIENT.open_by_key(SHEET_ID).sheet1  # Get first worksheet
+
+# Load data into DataFrame
+data = sheet.get_all_records()  # Gets all rows as list of dictionaries
+df = pd.DataFrame(data)
+
+# Fill missing repetition values with 0
+if 'Repetition' not in df.columns:
+    df['Repetition'] = 0
+else:
+    df['Repetition'] = df['Repetition'].fillna(0).astype(int)
+
 words = df.to_dict(orient="records")
+
+# ======== ADD THE FUNCTION RIGHT HERE ========
+def update_repetition_score(word, increment=1):
+    """Update repetition score in Google Sheets"""
+    try:
+        # Find the row with this word
+        cell = sheet.find(word)
+        repetition_col = df.columns.get_loc('Repetition') + 1  # gspread is 1-indexed
+        
+        # Get current value and update
+        current_value = int(sheet.cell(cell.row, repetition_col).value or 0)
+        new_value = current_value + increment
+        
+        # Update the sheet
+        sheet.update_cell(cell.row, repetition_col, new_value)
+        
+        # Also update our local DataFrame
+        df.loc[df['Word'] == word, 'Repetition'] = new_value
+        
+    except Exception as e:
+        st.error(f"Error updating repetition score: {e}")
+# ======== END OF FUNCTION ========
 
 # Initialize session state
 
@@ -99,6 +142,7 @@ else:
                 if selected == current_q['correct']:
                     st.success("Correct! ✅")
                     quiz['score'] += 1
+                    update_repetition_score(current_q['word'], increment=1)
                 else:
                     st.error(f"Wrong! The answer is: {current_q['correct']}")
         
@@ -113,8 +157,28 @@ else:
 
     # Final score screen
     else:
-        st.balloons()
-        st.subheader(f"Quiz Complete! Score: {quiz['score']}/20")
-        if st.button("Restart Quiz"):
-            st.session_state.clear()
-            st.rerun()
+    st.balloons()
+    st.subheader(f"Quiz Complete! Score: {quiz['score']}/20")
+    
+    # Progress Report - Show repetition score distribution
+    st.subheader("📊 Progress Report")
+    st.write("Occasions correctly answered / number of words")
+    
+    # Get all repetition values and count distribution
+    repetition_counts = df['Repetition'].value_counts().sort_index()
+    
+    # Display each repetition level
+    for rep_value in sorted(df['Repetition'].unique()):
+        count = repetition_counts.get(rep_value, 0)
+        st.write(f"{rep_value} / {count}")
+    
+    # Show summary stats
+    total_words = len(df)
+    mastered_words = len(df[df['Repetition'] > 0])
+    st.success(f"**Mastered: {mastered_words}/{total_words} words**")
+    
+    if st.button("Restart Quiz"):
+        st.session_state.clear()
+        st.rerun()
+    
+    
