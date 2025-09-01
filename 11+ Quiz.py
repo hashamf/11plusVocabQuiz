@@ -30,24 +30,27 @@ words = df.to_dict(orient="records")
 
 # ======== ADD THE FUNCTION RIGHT HERE ========
 def update_repetition_score(word, increment=1):
-    """Update repetition score in Google Sheets"""
+    """Update repetition score in Google Sheets with error handling"""
     try:
         # Find the row with this word
         cell = sheet.find(word)
-        repetition_col = df.columns.get_loc('Repetition') + 1  # gspread is 1-indexed
+        repetition_col = df.columns.get_loc('Repetition') + 1
         
-        # Get current value and update
+        # Get current value
         current_value = int(sheet.cell(cell.row, repetition_col).value or 0)
         new_value = current_value + increment
         
-        # Update the sheet
-        sheet.update_cell(cell.row, repetition_col, new_value)
+        # Update the sheet (with retry logic)
+        try:
+            sheet.update_cell(cell.row, repetition_col, new_value)
+        except Exception as update_error:
+            st.warning(f"Couldn't update Google Sheets, but continuing: {update_error}")
         
-        # Also update our local DataFrame
+        # Always update local DataFrame
         df.loc[df['Word'] == word, 'Repetition'] = new_value
         
     except Exception as e:
-        st.error(f"Error updating repetition score: {e}")
+        st.warning(f"Couldn't update repetition score for '{word}', but continuing: {e}")
 # ======== END OF FUNCTION ========
 
 # Initialize session state
@@ -182,5 +185,6 @@ else:
             st.rerun()
     
     
+
 
 
