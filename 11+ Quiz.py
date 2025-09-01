@@ -186,18 +186,19 @@ else:
         # Display each repetition level
         for rep_value in sorted(df['Repetition'].unique()):
             count = repetition_counts.get(rep_value, 0)
-            st.write(f"{rep_value} / {count}")
+            st.write(f"{rep_value} times correctly answered : {count} words")
         
         # Show summary stats
-        total_words = len(df)
-        mastered_words = len(df[df['Repetition'] > 0])
-        st.success(f"**Mastered: {mastered_words}/{total_words} words**")
+        #total_words = len(df)
+        #mastered_words = len(df[df['Repetition'] > 0])
+        #st.success(f"**Mastered: {mastered_words}/{total_words} words**")
         
         if st.button("Restart Quiz"):
             st.session_state.clear()
             st.rerun()
     
     
+
 
 
 
