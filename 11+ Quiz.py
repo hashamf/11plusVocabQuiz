@@ -2,23 +2,39 @@ import streamlit as st
 import pandas as pd
 import random
 
-# Google Sheets Setup
-import gspread
-from google.oauth2.service_account import Credentials
+# Google Sheets Setup with error handling
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
 
-# Authenticate with Google Sheets
-SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-SERVICE_ACCOUNT_INFO = st.secrets["gcp_service_account"]
-CREDS = Credentials.from_service_account_info(SERVICE_ACCOUNT_INFO, scopes=SCOPE)
-CLIENT = gspread.authorize(CREDS)
+    # Authenticate with Google Sheets
+    SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    SERVICE_ACCOUNT_INFO = st.secrets["gcp_service_account"]
+    CREDS = Credentials.from_service_account_info(SERVICE_ACCOUNT_INFO, scopes=SCOPE)
+    CLIENT = gspread.authorize(CREDS)
 
-# Open your Google Sheet
-SHEET_ID = st.secrets["sheets"]["sheet_id"]
-sheet = CLIENT.open_by_key(SHEET_ID).sheet1  # Get first worksheet
+    # Open your Google Sheet
+    SHEET_ID = st.secrets["sheets"]["sheet_id"]
+    sheet = CLIENT.open_by_key(SHEET_ID).sheet1
 
-# Load data into DataFrame
-data = sheet.get_all_records()  # Gets all rows as list of dictionaries
-df = pd.DataFrame(data)
+    # Load data into DataFrame
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
+    
+    st.success("✅ Connected to Google Sheets")
+
+except Exception as e:
+    st.error(f"❌ Google Sheets connection failed: {str(e)[:100]}...")
+    st.info("Using local data mode - scores won't be saved to Google Sheets")
+    
+    # Fallback: Create empty dataframe with required columns
+    df = pd.DataFrame(columns=['Word', 'Polished Definition', 'Part of Speech', 'Synonyms', 'Antonyms', 'Repetition'])
+    df['Repetition'] = df['Repetition'].fillna(0).astype(int)
+    
+    # Set a flag to disable Google Sheets updates
+    sheets_connected = False
+else:
+    sheets_connected = True
 
 # Fill missing repetition values with 0
 if 'Repetition' not in df.columns:
@@ -30,27 +46,24 @@ words = df.to_dict(orient="records")
 
 # ======== ADD THE FUNCTION RIGHT HERE ========
 def update_repetition_score(word, increment=1):
-    """Update repetition score in Google Sheets with error handling"""
+    """Update repetition score with connection check"""
     try:
-        # Find the row with this word
-        cell = sheet.find(word)
-        repetition_col = df.columns.get_loc('Repetition') + 1
+        # Update local DataFrame first (always works)
+        df.loc[df['Word'] == word, 'Repetition'] += increment
         
-        # Get current value
-        current_value = int(sheet.cell(cell.row, repetition_col).value or 0)
-        new_value = current_value + increment
-        
-        # Update the sheet (with retry logic)
-        try:
-            sheet.update_cell(cell.row, repetition_col, new_value)
-        except Exception as update_error:
-            st.warning(f"Couldn't update Google Sheets, but continuing: {update_error}")
-        
-        # Always update local DataFrame
-        df.loc[df['Word'] == word, 'Repetition'] = new_value
-        
+        # Only try Google Sheets if connected
+        if sheets_connected:
+            try:
+                cell = sheet.find(word)
+                repetition_col = df.columns.get_loc('Repetition') + 1
+                current_value = int(sheet.cell(cell.row, repetition_col).value or 0)
+                new_value = current_value + increment
+                sheet.update_cell(cell.row, repetition_col, new_value)
+            except Exception as sheet_error:
+                st.warning(f"Couldn't update Google Sheets, but local score saved")
+                
     except Exception as e:
-        st.warning(f"Couldn't update repetition score for '{word}', but continuing: {e}")
+        st.warning(f"Couldn't update score for '{word}'")
 # ======== END OF FUNCTION ========
 
 # Initialize session state
@@ -185,6 +198,7 @@ else:
             st.rerun()
     
     
+
 
 
 
