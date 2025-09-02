@@ -44,7 +44,7 @@ else:
 
 words = df.to_dict(orient="records")
 
-# ======== ADD THE FUNCTION RIGHT HERE ========
+# ======== REPETITION SCORE FUNCTION ========
 def update_repetition_score(word, increment=1):
     """Update repetition score with connection check"""
     try:
@@ -67,7 +67,6 @@ def update_repetition_score(word, increment=1):
 # ======== END OF FUNCTION ========
 
 # Initialize session state
-
 if 'quiz_started' not in st.session_state:
     st.session_state.quiz_started = False
 
@@ -87,7 +86,8 @@ else:
             'score': 0,
             'selected_option': None,
             'submitted': False,
-            'question_types': []
+            'question_types': [],
+            'user_answers': []  # ← ADDED: Track all user answers
         }
         
         # Generate question types (10 defs, 7 syns, 3 ants)
@@ -155,7 +155,18 @@ else:
         if not quiz['submitted']:
             if st.button("Submit", disabled=selected is None):
                 quiz['submitted'] = True
-                if selected == current_q['correct']:
+                is_correct = selected == current_q['correct']
+                
+                # RECORD USER ANSWER ← ADDED
+                quiz['user_answers'].append({
+                    'word': current_q['word'],
+                    'correct': is_correct,
+                    'user_choice': selected,
+                    'correct_answer': current_q['correct'],
+                    'question_type': current_q['type']
+                })
+                
+                if is_correct:
                     st.success("Correct! ✅")
                     quiz['score'] += 1
                     update_repetition_score(current_q['word'], increment=1)
@@ -188,18 +199,45 @@ else:
             count = repetition_counts.get(rep_value, 0)
             st.write(f"{rep_value} times correctly answered : {count} words")
         
-        # Show summary stats
-        #total_words = len(df)
-        #mastered_words = len(df[df['Repetition'] > 0])
-        #st.success(f"**Mastered: {mastered_words}/{total_words} words**")
+        # Detailed Results Breakdown ← ADDED
+        st.subheader("📝 Detailed Results")
+        
+        # Separate correct and incorrect answers
+        correct_words = []
+        incorrect_words = []
+        
+        for answer in quiz['user_answers']:
+            word_info = next((w for w in words if w['Word'] == answer['word']), None)
+            if word_info:
+                result_item = {
+                    'Word': answer['word'],
+                    'Part of Speech': word_info['Part of Speech'],
+                    'Definition': word_info['Polished Definition'],
+                    'Synonyms': word_info['Synonyms'],
+                    'Antonyms': word_info['Antonyms'],
+                    'Your Answer': answer['user_choice'],
+                    'Correct Answer': answer['correct_answer'],
+                    'Question Type': answer['question_type']
+                }
+                
+                if answer['correct']:
+                    correct_words.append(result_item)
+                else:
+                    incorrect_words.append(result_item)
+        
+        # Display results in expandable sections
+        with st.expander(f"✅ Words You Got Right ({len(correct_words)})", expanded=True):
+            if correct_words:
+                st.dataframe(pd.DataFrame(correct_words), hide_index=True, use_container_width=True)
+            else:
+                st.write("No words answered correctly")
+        
+        with st.expander(f"❌ Words You Got Wrong ({len(incorrect_words)})", expanded=True):
+            if incorrect_words:
+                st.dataframe(pd.DataFrame(incorrect_words), hide_index=True, use_container_width=True)
+            else:
+                st.write("All words answered correctly! 🎉")
         
         if st.button("Restart Quiz"):
             st.session_state.clear()
             st.rerun()
-    
-    
-
-
-
-
-
