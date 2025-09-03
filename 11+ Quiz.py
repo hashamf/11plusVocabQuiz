@@ -2,39 +2,53 @@ import streamlit as st
 import pandas as pd
 import random
 
-# Google Sheets Setup with error handling
-try:
-    import gspread
-    from google.oauth2.service_account import Credentials
+# Initialize session state for Google Sheets data
+if 'sheets_connected' not in st.session_state:
+    st.session_state.sheets_connected = False
+if 'df' not in st.session_state:
+    st.session_state.df = None
+if 'words' not in st.session_state:
+    st.session_state.words = None
+if 'sheet' not in st.session_state:
+    st.session_state.sheet = None
 
-    # Authenticate with Google Sheets
-    SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    SERVICE_ACCOUNT_INFO = st.secrets["gcp_service_account"]
-    CREDS = Credentials.from_service_account_info(SERVICE_ACCOUNT_INFO, scopes=SCOPE)
-    CLIENT = gspread.authorize(CREDS)
+# Google Sheets Setup - ONLY ONCE at start
+if st.session_state.df is None:
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
 
-    # Open your Google Sheet
-    SHEET_ID = st.secrets["sheets"]["sheet_id"]
-    sheet = CLIENT.open_by_key(SHEET_ID).sheet1
+        # Authenticate with Google Sheets
+        SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        SERVICE_ACCOUNT_INFO = st.secrets["gcp_service_account"]
+        CREDS = Credentials.from_service_account_info(SERVICE_ACCOUNT_INFO, scopes=SCOPE)
+        CLIENT = gspread.authorize(CREDS)
 
-    # Load data into DataFrame
-    data = sheet.get_all_records()
-    df = pd.DataFrame(data)
-    
-    st.success("✅ Connected to Google Sheets")
+        # Open your Google Sheet
+        SHEET_ID = st.secrets["sheets"]["sheet_id"]
+        sheet = CLIENT.open_by_key(SHEET_ID).sheet1
+        st.session_state.sheet = sheet
 
-except Exception as e:
-    st.error(f"❌ Google Sheets connection failed: {str(e)[:100]}...")
-    st.info("Using local data mode - scores won't be saved to Google Sheets")
-    
-    # Fallback: Create empty dataframe with required columns
-    df = pd.DataFrame(columns=['Word', 'Polished Definition', 'Part of Speech', 'Synonyms', 'Antonyms', 'Repetition'])
-    df['Repetition'] = df['Repetition'].fillna(0).astype(int)
-    
-    # Set a flag to disable Google Sheets updates
-    sheets_connected = False
-else:
-    sheets_connected = True
+        # Load data into DataFrame ONCE
+        data = sheet.get_all_records()
+        df = pd.DataFrame(data)
+        st.session_state.df = df
+        st.session_state.sheets_connected = True
+        st.success("✅ Connected to Google Sheets - Data loaded")
+
+    except Exception as e:
+        st.error(f"❌ Google Sheets connection failed: {str(e)[:100]}...")
+        st.info("Using local data mode - scores won't be saved to Google Sheets")
+        # Fallback: Create empty dataframe
+        df = pd.DataFrame(columns=['Word', 'Polished Definition', 'Part of Speech', 'Synonyms', 'Antonyms', 'Repetition'])
+        df['Repetition'] = df['Repetition'].fillna(0).astype(int)
+        st.session_state.df = df
+        st.session_state.sheets_connected = False
+
+# Get data from session state
+df = st.session_state.df
+sheets_connected = st.session_state.sheets_connected
+sheet = st.session_state.sheet if hasattr(st.session_state, 'sheet') else None
 
 # Fill missing repetition values with 0
 if 'Repetition' not in df.columns:
@@ -43,28 +57,31 @@ else:
     df['Repetition'] = df['Repetition'].fillna(0).astype(int)
 
 words = df.to_dict(orient="records")
+st.session_state.words = words
 
-# ======== REPETITION SCORE FUNCTION ========
+# ======== UPDATED REPETITION SCORE FUNCTION ========
 def update_repetition_score(word, increment=1):
-    """Update repetition score with connection check"""
+    """Update repetition score LOCALLY ONLY during quiz"""
     try:
-        # Update local DataFrame first (always works)
+        # Update local DataFrame only (no API calls during quiz)
         df.loc[df['Word'] == word, 'Repetition'] += increment
-        
-        # Only try Google Sheets if connected
-        if sheets_connected:
-            try:
-                cell = sheet.find(word)
-                repetition_col = df.columns.get_loc('Repetition') + 1
-                current_value = int(sheet.cell(cell.row, repetition_col).value or 0)
-                new_value = current_value + increment
-                sheet.update_cell(cell.row, repetition_col, new_value)
-            except Exception as sheet_error:
-                st.warning(f"Couldn't update Google Sheets, but local score saved")
-                
+        st.session_state.df = df  # Keep updated in session state
     except Exception as e:
         st.warning(f"Couldn't update score for '{word}'")
-# ======== END OF FUNCTION ========
+
+# ======== BULK UPLOAD FUNCTION ========
+def upload_all_scores():
+    """Upload ALL updated scores to Google Sheets at ONCE"""
+    if sheets_connected and sheet is not None:
+        try:
+            # Convert updated DataFrame back to list of lists
+            all_data = [df.columns.values.tolist()] + df.values.tolist()
+            # Update entire sheet in ONE API call
+            sheet.update(all_data)
+            st.success("✅ All scores saved to Google Sheets!")
+        except Exception as e:
+            st.error(f"❌ Failed to save scores to Google Sheets: {str(e)[:100]}...")
+# ======== END OF FUNCTIONS ========
 
 # Initialize session state
 if 'quiz_started' not in st.session_state:
@@ -87,7 +104,7 @@ else:
             'selected_option': None,
             'submitted': False,
             'question_types': [],
-            'user_answers': []  # ← ADDED: Track all user answers
+            'user_answers': []
         }
         
         # Generate question types (10 defs, 7 syns, 3 ants)
@@ -118,13 +135,17 @@ else:
                 other_defs = [w['Polished Definition'] for w in words 
                             if w['Part of Speech'] == current_q['pos'] 
                             and w['Polished Definition'] != current_q['correct']]
-                quiz['options'] = random.sample(other_defs, 4) + [current_q['correct']]
+                # SMART FALLBACK: Use available options
+                num_options = min(4, len(other_defs))
+                quiz['options'] = random.sample(other_defs, num_options) + [current_q['correct']]
             
             elif current_q['type'] in ['synonym', 'antonym']:
                 other_words = [w['Word'] for w in words 
                             if w['Part of Speech'] == current_q['pos']
                             and w['Word'] != current_q['word']]
-                quiz['options'] = random.sample(other_words, 4) + [current_q['correct']]
+                # SMART FALLBACK: Use available options
+                num_options = min(4, len(other_words))
+                quiz['options'] = random.sample(other_words, num_options) + [current_q['correct']]
             
             random.shuffle(quiz['options'])
 
@@ -157,7 +178,7 @@ else:
                 quiz['submitted'] = True
                 is_correct = selected == current_q['correct']
                 
-                # RECORD USER ANSWER ← ADDED
+                # RECORD USER ANSWER
                 quiz['user_answers'].append({
                     'word': current_q['word'],
                     'correct': is_correct,
@@ -187,6 +208,10 @@ else:
         st.balloons()
         st.subheader(f"Quiz Complete! Score: {quiz['score']}/20")
         
+        # UPLOAD ALL SCORES AT ONCE (Bulk API call)
+        if sheets_connected:
+            upload_all_scores()
+        
         # Progress Report - Show repetition score distribution
         st.subheader("📊 Progress Report")
         st.write("Occasions correctly answered / number of words")
@@ -199,7 +224,7 @@ else:
             count = repetition_counts.get(rep_value, 0)
             st.write(f"{rep_value} times correctly answered : {count} words")
         
-        # Detailed Results Breakdown ← ADDED
+        # Detailed Results Breakdown
         st.subheader("📝 Detailed Results")
         
         # Separate correct and incorrect answers
