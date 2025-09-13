@@ -111,10 +111,29 @@ else:
         question_types = (['definition'] * 10) + (['synonym'] * 7) + (['antonym'] * 3)
         random.shuffle(question_types)
         st.session_state.quiz_data['question_types'] = question_types
-        
+
+
         # Prepare all questions upfront
+        used_words = set()  # Track words already used in this quiz
+        
+        # Get minimum repetition value in the entire dataset
+        min_rep = min(word['Repetition'] for word in words)
+        
         for q_type in question_types:
-            word = random.choice(words)
+            # FIRST: Only use words with the current minimum repetition value
+            eligible_words = [w for w in words if w['Repetition'] == min_rep]
+            
+            # SECOND: From eligible words, avoid duplicates within this quiz
+            available_words = [w for w in eligible_words if w['Word'] not in used_words]
+            
+            # Fallback: If no unique words left at this repetition level, use any eligible words
+            if not available_words:
+                available_words = eligible_words
+                
+            word = random.choice(available_words)
+            used_words.add(word['Word'])  # Mark this word as used
+      
+            
             st.session_state.quiz_data['questions'].append({
                 'word': word['Word'],
                 'type': q_type,
@@ -123,7 +142,7 @@ else:
                         else random.choice(word['Antonyms'].split(', ')),
                 'pos': word['Part of Speech']
             })
-
+ 
     # Get current question data
     quiz = st.session_state.quiz_data
     if quiz['current_question'] < 20:  # Only proceed if questions remain
@@ -160,29 +179,19 @@ else:
         else:
             st.subheader(f"Which word is an antonym of {current_q['word']}?")
 
-        # Radio buttons - disabled after submission
-        selected = st.radio(
-            "Choose:",
-            quiz['options'],
-            index=quiz['options'].index(quiz['selected_option']) if quiz['selected_option'] in quiz['options'] else None,
-            disabled=quiz['submitted']
-        )
-
-        # Store selection
-        if not quiz['submitted']:
-            quiz['selected_option'] = selected
-
-        # Submit button - only enabled when an option is selected
-        if not quiz['submitted']:
-            if st.button("Submit", disabled=selected is None):
+        # Display each option as a clickable button (replaces radio buttons + submit button)
+        st.write("**Choose your answer:**") 
+        for option in quiz['options']:
+            if st.button(option, key=f"opt_{option}", disabled=quiz['submitted'], use_container_width=True):
+                quiz['selected_option'] = option
                 quiz['submitted'] = True
-                is_correct = selected == current_q['correct']
                 
-                # RECORD USER ANSWER
+                # PROCESS ANSWER IMMEDIATELY
+                is_correct = option == current_q['correct']
                 quiz['user_answers'].append({
                     'word': current_q['word'],
                     'correct': is_correct,
-                    'user_choice': selected,
+                    'user_choice': option,
                     'correct_answer': current_q['correct'],
                     'question_type': current_q['type']
                 })
@@ -193,6 +202,9 @@ else:
                     update_repetition_score(current_q['word'], increment=1)
                 else:
                     st.error(f"Wrong! The answer is: {current_q['correct']}")
+                
+                st.rerun()
+
         
         # Next question button - only shows after submission
         if quiz['submitted']:
@@ -266,3 +278,4 @@ else:
         if st.button("Restart Quiz"):
             st.session_state.clear()
             st.rerun()
+
