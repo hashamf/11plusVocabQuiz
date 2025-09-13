@@ -183,40 +183,80 @@ else:
         # Display each option as a clickable button (replaces radio buttons + submit button)
         st.write("**Choose your answer:**") 
         
-        for option in quiz['options']:
-            if st.button(option, key=f"opt_{option}", disabled=quiz['submitted'], use_container_width=True):
-                quiz['selected_option'] = option
-                quiz['submitted'] = True
-                
-                # PROCESS ANSWER IMMEDIATELY
-                is_correct = option == current_q['correct']
-                quiz['user_answers'].append({
-                    'word': current_q['word'],
-                    'correct': is_correct,
-                    'user_choice': option,
-                    'correct_answer': current_q['correct'],
-                    'question_type': current_q['type']
-                })
-                
-                if is_correct:
-                    st.success("✅ Correct!")
-                    quiz['score'] += 1
-                    update_repetition_score(current_q['word'], increment=1)
-                else:
-                    st.error(f"❌ Wrong! The correct answer was: **{current_q['correct']}**")
-                
-                # Show explanation box ← ADDED
-                with st.expander("💡 Explanation", expanded=True):
-                    word_info = next((w for w in words if w['Word'] == current_q['word']), None)
-                    if word_info:
-                        st.write(f"**Word:** {current_q['word']}")
-                        st.write(f"**Part of Speech:** {word_info['Part of Speech']}")
-                        st.write(f"**Definition:** {word_info['Polished Definition']}")
-                        st.write(f"**Synonyms:** {word_info['Synonyms']}")
-                        st.write(f"**Antonyms:** {word_info['Antonyms']}")
-                
-                st.rerun()
 
+
+
+            for option in quiz['options']:
+                if st.button(option, key=f"opt_{option}", disabled=quiz['submitted'], use_container_width=True):
+                    quiz['selected_option'] = option
+                    quiz['submitted'] = True
+                    
+                    # PROCESS ANSWER IMMEDIATELY
+                    is_correct = option == current_q['correct']
+                    quiz['user_answers'].append({
+                        'word': current_q['word'],
+                        'correct': is_correct,
+                        'user_choice': option,
+                        'correct_answer': current_q['correct'],
+                        'question_type': current_q['type']
+                    })
+                    
+                    if is_correct:
+                        st.success("✅ Correct!")
+                        quiz['score'] += 1
+                        update_repetition_score(current_q['word'], increment=1)
+                    else:
+                        st.error(f"❌ Wrong! The correct answer was: **{current_q['correct']}**")
+                    
+                    # Show explanation box
+                    with st.expander("💡 Explanation", expanded=True):
+                        word_info = next((w for w in words if w['Word'] == current_q['word']), None)
+                        if word_info:
+                            st.write(f"**Word:** {current_q['word']}")
+                            st.write(f"**Part of Speech:** {word_info['Part of Speech']}")
+                            st.write(f"**Definition:** {word_info['Polished Definition']}")
+                            st.write(f"**Synonyms:** {word_info['Synonyms']}")
+                            st.write(f"**Antonyms:** {word_info['Antonyms']}")
+                    
+                    # STORE the feedback in session state so it persists through rerun
+                    st.session_state.feedback = {
+                        'is_correct': is_correct,
+                        'message': "✅ Correct!" if is_correct else f"❌ Wrong! The correct answer was: **{current_q['correct']}**",
+                        'word_info': word_info,
+                        'current_word': current_q['word']
+                    }
+                    
+                    st.rerun()
+            
+            # AFTER the buttons, show persistent feedback if it exists
+            if quiz['submitted'] and 'feedback' in st.session_state:
+                feedback = st.session_state.feedback
+                if feedback['is_correct']:
+                    st.success(feedback['message'])
+                else:
+                    st.error(feedback['message'])
+                
+                # Show explanation box
+                with st.expander("💡 Explanation", expanded=True):
+                    if feedback['word_info']:
+                        st.write(f"**Word:** {feedback['current_word']}")
+                        st.write(f"**Part of Speech:** {feedback['word_info']['Part of Speech']}")
+                        st.write(f"**Definition:** {feedback['word_info']['Polished Definition']}")
+                        st.write(f"**Synonyms:** {feedback['word_info']['Synonyms']}")
+                        st.write(f"**Antonyms:** {feedback['word_info']['Antonyms']}")
+                
+                # Countdown timer
+                st.write("⏳ Moving to next question in 3 seconds...")
+                time.sleep(3)
+                
+                # Clean up and move to next question
+                del st.session_state.feedback  # Remove stored feedback
+                quiz['current_question'] += 1
+                quiz['selected_option'] = None
+                quiz['submitted'] = False
+                quiz.pop('options', None)
+                st.rerun()
+        
         
         # Automatic next question after 3 seconds ← REPLACED NEXT QUESTION BUTTON
         if quiz['submitted']:
@@ -295,3 +335,4 @@ else:
         if st.button("Restart Quiz"):
             st.session_state.clear()
             st.rerun()
+
