@@ -246,7 +246,7 @@ else:
                     st.write(f"**Antonyms:** {feedback['word_info']['Antonyms']}")
             
             # Countdown timer
-            st.write("⏳ Moving to next question in 10 seconds...")
+            st.write("⏳ Moving to next question ...")
             time.sleep(10)
             
             # Clean up and move to next question
@@ -260,7 +260,7 @@ else:
         
         # Automatic next question after 3 seconds ← REPLACED NEXT QUESTION BUTTON
         if quiz['submitted']:
-            st.write("⏳ Moving to next question in 10 seconds...")
+            st.write("⏳ Moving to next question ...")
             
             # Add delay
             time.sleep(10)
@@ -335,6 +335,7 @@ else:
         if st.button("Restart Quiz"):
             st.session_state.clear()
             st.rerun()
+
 
 
 
