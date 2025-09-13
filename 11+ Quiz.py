@@ -258,19 +258,7 @@ else:
             st.rerun()
         
         
-        # Automatic next question after 3 seconds ← REPLACED NEXT QUESTION BUTTON
-        if quiz['submitted']:
-            st.write("⏳ Moving to next question ...")
-            
-            # Add delay
-            time.sleep(10)
-            
-            # Move to next question
-            quiz['current_question'] += 1
-            quiz['selected_option'] = None
-            quiz['submitted'] = False
-            quiz.pop('options', None)
-            st.rerun()
+
 
     # Final score screen
     else:
@@ -335,6 +323,7 @@ else:
         if st.button("Restart Quiz"):
             st.session_state.clear()
             st.rerun()
+
 
 
 
