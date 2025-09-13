@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import random
+import time  # ← ADDED
 
 # Initialize session state for Google Sheets data
 if 'sheets_connected' not in st.session_state:
@@ -181,6 +182,7 @@ else:
 
         # Display each option as a clickable button (replaces radio buttons + submit button)
         st.write("**Choose your answer:**") 
+        
         for option in quiz['options']:
             if st.button(option, key=f"opt_{option}", disabled=quiz['submitted'], use_container_width=True):
                 quiz['selected_option'] = option
@@ -197,23 +199,38 @@ else:
                 })
                 
                 if is_correct:
-                    st.success("Correct! ✅")
+                    st.success("✅ Correct!")
                     quiz['score'] += 1
                     update_repetition_score(current_q['word'], increment=1)
                 else:
-                    st.error(f"Wrong! The answer is: {current_q['correct']}")
+                    st.error(f"❌ Wrong! The correct answer was: **{current_q['correct']}**")
+                
+                # Show explanation box ← ADDED
+                with st.expander("💡 Explanation", expanded=True):
+                    word_info = next((w for w in words if w['Word'] == current_q['word']), None)
+                    if word_info:
+                        st.write(f"**Word:** {current_q['word']}")
+                        st.write(f"**Part of Speech:** {word_info['Part of Speech']}")
+                        st.write(f"**Definition:** {word_info['Polished Definition']}")
+                        st.write(f"**Synonyms:** {word_info['Synonyms']}")
+                        st.write(f"**Antonyms:** {word_info['Antonyms']}")
                 
                 st.rerun()
 
         
-        # Next question button - only shows after submission
+        # Automatic next question after 3 seconds ← REPLACED NEXT QUESTION BUTTON
         if quiz['submitted']:
-            if st.button("Next Question"):
-                quiz['current_question'] += 1
-                quiz['selected_option'] = None
-                quiz['submitted'] = False
-                quiz.pop('options', None)
-                st.rerun()
+            st.write("⏳ Moving to next question in 3 seconds...")
+            
+            # Add delay
+            time.sleep(3)
+            
+            # Move to next question
+            quiz['current_question'] += 1
+            quiz['selected_option'] = None
+            quiz['submitted'] = False
+            quiz.pop('options', None)
+            st.rerun()
 
     # Final score screen
     else:
@@ -278,4 +295,3 @@ else:
         if st.button("Restart Quiz"):
             st.session_state.clear()
             st.rerun()
-
