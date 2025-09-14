@@ -229,28 +229,28 @@ else:
                 st.rerun()
         
         # AFTER the buttons, show persistent feedback if it exists
-        if quiz['submitted'] and 'feedback' in st.session_state:
-            feedback = st.session_state.feedback
-            if feedback['is_correct']:
-                st.success(feedback['message'])
+        if quiz['submitted']:
+            # Show feedback
+            if quiz['user_answers'] and quiz['user_answers'][-1]['correct']:
+                st.success("✅ Correct!")
             else:
-                st.error(feedback['message'])
+                st.error(f"❌ Wrong! The correct answer was: **{current_q['correct']}**")
             
             # Show explanation box
             with st.expander("💡 Explanation", expanded=True):
-                if feedback['word_info']:
-                    st.write(f"**Word:** {feedback['current_word']}")
-                    st.write(f"**Part of Speech:** {feedback['word_info']['Part of Speech']}")
-                    st.write(f"**Definition:** {feedback['word_info']['Polished Definition']}")
-                    st.write(f"**Synonyms:** {feedback['word_info']['Synonyms']}")
-                    st.write(f"**Antonyms:** {feedback['word_info']['Antonyms']}")
+                word_info = next((w for w in words if w['Word'] == current_q['word']), None)
+                if word_info:
+                    st.write(f"**Word:** {current_q['word']}")
+                    st.write(f"**Part of Speech:** {word_info['Part of Speech']}")
+                    st.write(f"**Definition:** {word_info['Polished Definition']}")
+                    st.write(f"**Synonyms:** {word_info['Synonyms']}")
+                    st.write(f"**Antonyms:** {word_info['Antonyms']}")
             
             # Countdown timer
-            st.write("⏳ Moving to next question ...")
+            st.write("⏳ Moving to next question in 10 seconds...")
             time.sleep(10)
             
-            # Clean up and move to next question
-            del st.session_state.feedback  # Remove stored feedback
+            # Move to next question
             quiz['current_question'] += 1
             quiz['selected_option'] = None
             quiz['submitted'] = False
@@ -323,6 +323,7 @@ else:
         if st.button("Restart Quiz"):
             st.session_state.clear()
             st.rerun()
+
 
 
 
