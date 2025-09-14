@@ -247,8 +247,8 @@ else:
                     st.write(f"**Antonyms:** {word_info['Antonyms']}")
             
             # Countdown timer
-            st.write("⏳ Moving to next question in 10 seconds...")
-            time.sleep(10)
+            st.write("⏳ Moving to next question in 6 seconds...")
+            time.sleep(6)
             
             # Move to next question
             quiz['current_question'] += 1
@@ -323,6 +323,7 @@ else:
         if st.button("Restart Quiz"):
             st.session_state.clear()
             st.rerun()
+
 
 
 
