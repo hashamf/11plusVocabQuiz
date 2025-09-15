@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import random
-import time  # ← ADDED
+import time
 
 # Initialize session state for Google Sheets data
 if 'sheets_connected' not in st.session_state:
@@ -146,6 +146,11 @@ else:
  
     # Get current question data
     quiz = st.session_state.quiz_data
+    
+    # CLEAR ANY OLD FEEDBACK TO PREVENT CONFLICTS
+    if 'feedback' in st.session_state:
+        del st.session_state.feedback
+
     if quiz['current_question'] < 20:  # Only proceed if questions remain
         current_q = quiz['questions'][quiz['current_question']]
         
@@ -183,9 +188,6 @@ else:
         # Display each option as a clickable button (replaces radio buttons + submit button)
         st.write("**Choose your answer:**") 
         
-
-
-
         for option in quiz['options']:
             if st.button(option, key=f"opt_{option}", disabled=quiz['submitted'], use_container_width=True):
                 quiz['selected_option'] = option
@@ -218,14 +220,6 @@ else:
                         st.write(f"**Synonyms:** {word_info['Synonyms']}")
                         st.write(f"**Antonyms:** {word_info['Antonyms']}")
                 
-                # STORE the feedback in session state so it persists through rerun
-                st.session_state.feedback = {
-                    'is_correct': is_correct,
-                    'message': "✅ Correct!" if is_correct else f"❌ Wrong! The correct answer was: **{current_q['correct']}**",
-                    'word_info': word_info,
-                    'current_word': current_q['word']
-                }
-                
                 st.rerun()
         
         # AFTER the buttons, show persistent feedback if it exists
@@ -256,9 +250,6 @@ else:
             quiz['submitted'] = False
             quiz.pop('options', None)
             st.rerun()
-        
-        
-
 
     # Final score screen
     else:
@@ -323,10 +314,3 @@ else:
         if st.button("Restart Quiz"):
             st.session_state.clear()
             st.rerun()
-
-
-
-
-
-
-
